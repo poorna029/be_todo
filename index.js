@@ -36,7 +36,7 @@ app.post("/register", async (request, response) => {
     name TEXT NOT NULL,
     username TEXT NOT NULL,
     password TEXT NOT NULL,
-    gender TEXT,location TEXT
+    gender TEXT,location TEXT 
 
 );`;
   await db.run(create_table_qry);
@@ -49,19 +49,20 @@ app.post("/register", async (request, response) => {
     // user not registered yet:
     if (len_of_password < 5) {
       response.status(400);
-      response.send("Password is too short");
+      response.send({ err: "Password is too short" });
     } else {
       const Register_Qry = `insert into users
             (name,username,password,gender,location
             ) values("${name}","${username}",
             "${hashedpassword}","${gender}","${location}");`;
       await db.run(Register_Qry);
-      response.send("User created successfully");
+      response.status(200);
+      response.send({ data: "User created successfully" });
     }
   } else {
     // user registered
     response.status(400);
-    response.send("User already exists");
+    response.send({ err: "User already exists" });
   }
 });
 
@@ -78,7 +79,7 @@ app.post("/login", async (request, response) => {
   if (Check_User === undefined) {
     // not registered trying to login:
     response.status(400);
-    response.send("Invalid user");
+    response.send({ err: "Invalid user" });
   } else {
     // registered credentials needed to prove:
     // password matches
@@ -88,12 +89,13 @@ app.post("/login", async (request, response) => {
       //   response.send(200);
       const payload = { username: username };
       const jwtToken = await jwt.sign(payload, "lkjhgfdsa");
+      response.status(200);
       response.send({ jwtToken });
     }
     // password mismatch
     else {
       response.status(400);
-      response.send("Invalid password");
+      response.send({ err: "Invalid password" });
     }
   }
 });
@@ -111,18 +113,18 @@ app.put("/change-password", authenticateFn, async (request, response) => {
   if (is_pw_matches) {
     if (len_new_pw < 5) {
       response.status(400);
-      response.send("Password is too short");
+      response.send({ err: "Password is too short" });
     } else {
       const hashed_new_pw = await bcrypt.hash(newPassword, 15);
       const update_pw_qry = `update users set password="${hashed_new_pw}"
             where username="${username}";`;
       await db.run(update_pw_qry);
-      response.send("Password updated");
+      response.send({ data: "Password updated" });
     }
   } else {
     // password mismatch
     response.status(400);
-    response.send("Invalid current password");
+    response.send({ err: "Invalid current password" });
   }
 });
 
@@ -133,19 +135,19 @@ function authenticateFn(request, response, next) {
   if (auth_input === undefined) {
     //   possibility1 : token not provided
     response.status(400);
-    response.send("Invalid JWT Token");
+    response.send({ err: "Invalid JWT Token" });
   } else {
     // possibility2  : token is invalid
     //   possibility3 : correct token
     let jwtToken = auth_input.split(" ")[1];
     if (jwtToken === undefined) {
       response.status(401);
-      response.send("Invalid JWT Token");
+      response.send({ err: "Invalid JWT Token" });
     } else {
       const payload = jwt.verify(jwtToken, "lkjhgfdsa", (error, user) => {
         if (error) {
           response.status(401);
-          response.send("Invalid JWT Token");
+          response.send({ err: "Invalid JWT Token" });
         } else {
           request.username = user.username;
           next();
@@ -177,10 +179,11 @@ app.post("/add_todo", authenticateFn, async (request, response) => {
   const create_add_todo_qry = `insert into todos(todo,status,username) values("${todo}","${status}","${username}");`;
   if (!is_exists.length) {
     const res = await db.run(create_add_todo_qry);
-    response.send(`created successfully with todo_id ${res.lastID}`);
+    response.status(200);
+    response.send({ data: `created successfully with todo_id ${res.lastID}` });
   } else {
     response.status(400);
-    response.send("todo already exists");
+    response.send({ err: "todo already exists" });
   }
 });
 
@@ -196,11 +199,13 @@ app.delete("/delete_todo", authenticateFn, async (request, response) => {
   const is_exists = await db.get(get_qry);
   if (is_exists) {
     const res = await db.run(delete_todo_qry);
-    response.send(
-      `${is_exists.todo} is deleted sussessfully with todo_id ${todo_id} `
-    );
+    response.status(200);
+    response.send({
+      data: `${is_exists.todo} is deleted sussessfully with todo_id ${todo_id} `,
+    });
   } else {
-    response.send(`no todo with associated todo_id - ${todo_id}`);
+    response.status(400);
+    response.send({ err: `no todo with associated todo_id - ${todo_id}` });
   }
 });
 
@@ -209,9 +214,11 @@ app.get("/show_todos", authenticateFn, async (request, response) => {
   const get_qry = `select * from todos where username="${username}";`;
   const todos = await db.all(get_qry);
   if (todos) {
+    response.status(200);
     response.send(todos);
   } else {
-    response.send("no records found");
+    response.status(400);
+    response.send({ err: "no records found" });
   }
 });
 
@@ -222,8 +229,10 @@ app.put("/edit_todo", authenticateFn, async (request, response) => {
   if (todo_exixts) {
     const edit_qry = `update todos set todo = "${todo}" where todo_id=${todo_id};`;
     const res = await db.run(edit_qry);
+    response.status(200);
     response.send(`updated todo from ${todo_exixts.todo} to ${todo}`);
   } else {
+    response.status(400);
     response.send("todo not found");
   }
 });
